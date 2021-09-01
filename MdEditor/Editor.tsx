@@ -1,6 +1,7 @@
 import {
   computed,
   defineComponent,
+  onUnmounted,
   PropType,
   provide,
   reactive,
@@ -285,6 +286,8 @@ export default defineComponent({
     provide('usedLanguageText', usedLanguageText);
     // -end-
 
+    console.log('previewOnly', !previewOnly);
+
     // 监听上传图片
     !previewOnly &&
       bus.on({
@@ -343,6 +346,14 @@ export default defineComponent({
     // 进入时若默认全屏，调整一次
     adjustBody();
     // ----end----
+
+    console.log(bus);
+
+    onUnmounted(() => {
+      if (!previewOnly) {
+        bus.clear();
+      }
+    });
 
     return () => (
       <div
