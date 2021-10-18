@@ -3,6 +3,7 @@ import { UserConfigExport, ConfigEnv } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import vueJsx from '@vitejs/plugin-vue-jsx';
 import nodeService from './vitePlugins/nodeService';
+import viteSSR from 'vite-ssr/plugin.js';
 
 // https://segmentfault.com/a/1190000040127796
 import dts from 'vite-plugin-dts';
@@ -47,6 +48,20 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
       vue(),
       vueJsx(),
       nodeService(),
+      viteSSR(),
+      {
+        name: 'virtual',
+        resolveId(id) {
+          if (id === '@foo') {
+            return id;
+          }
+        },
+        load(id) {
+          if (id === '@foo') {
+            return `export default { msg: 'hi' }`;
+          }
+        }
+      },
       mode === 'production' &&
         dts({
           include: './MdEditor/*'
