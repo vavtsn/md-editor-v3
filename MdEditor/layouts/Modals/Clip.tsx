@@ -3,13 +3,15 @@ import {
   PropType,
   inject,
   ref,
-  onMounted,
   reactive,
   nextTick,
-  ComputedRef
+  ComputedRef,
+  watch,
+  computed
 } from 'vue';
 import Modal from '../../components/Modal';
-import { StaticTextDefaultValue, prefix } from '../../Editor';
+import { StaticTextDefaultValue } from '../../type';
+import { prefix } from '../../config';
 import { base642File } from '../../utils';
 import bus from '../../utils/event-bus';
 
@@ -28,50 +30,104 @@ export default defineComponent({
     onOk: {
       type: Function as PropType<(data?: any) => void>,
       default: () => () => {}
-    },
-    to: {
-      type: Element as PropType<HTMLElement>,
-      default: () => document.body
     }
   },
   setup(props) {
     const ult = inject('usedLanguageText') as ComputedRef<StaticTextDefaultValue>;
+    const editorId = inject('editorId') as string;
+    // 传递下来的图片裁剪构造函数
+    let Cropper = inject('Cropper') as any;
 
     const uploadRef = ref();
     const uploadImgRef = ref();
 
+    // 预览框
+    const previewTargetRef = ref();
+
     const data = reactive({
+      cropperInited: false,
       imgSelected: false,
-      imgSrc: ''
+      imgSrc: '',
+      // 是否全屏
+      isFullscreen: false
     });
 
     let cropper: any = null;
 
-    onMounted(() => {
-      (uploadRef.value as HTMLInputElement).addEventListener('change', () => {
-        const fileList = (uploadRef.value as HTMLInputElement).files || [];
+    watch(
+      () => props.visible,
+      () => {
+        // 显示时构建实例及监听事件
+        if (props.visible && !data.cropperInited) {
+          Cropper = Cropper || window.Cropper;
 
-        // 切换模式
-        data.imgSelected = true;
+          // 直接定义onchange，防止创建新的实例时遗留事件
+          (uploadRef.value as HTMLInputElement).onchange = () => {
+            const fileList = (uploadRef.value as HTMLInputElement).files || [];
 
-        if (fileList?.length > 0) {
-          const fileReader = new FileReader();
+            // 切换模式
+            data.imgSelected = true;
 
-          fileReader.onload = (e: any) => {
-            data.imgSrc = e.target.result;
+            if (fileList?.length > 0) {
+              const fileReader = new FileReader();
 
-            nextTick(() => {
-              cropper = new window.Cropper(uploadImgRef.value, {
-                viewMode: 2,
-                preview: `.${prefix}-clip-preview-target`
-                // aspectRatio: 16 / 9,
-              });
-            });
+              fileReader.onload = (e: any) => {
+                data.imgSrc = e.target.result;
+
+                nextTick(() => {
+                  cropper = new Cropper(uploadImgRef.value, {
+                    viewMode: 2,
+                    preview: `.${prefix}-clip-preview-target`
+                    // aspectRatio: 16 / 9,
+                  });
+                });
+              };
+
+              fileReader.readAsDataURL(fileList[0]);
+            }
           };
-
-          fileReader.readAsDataURL(fileList[0]);
         }
-      });
+      }
+    );
+
+    // 图片选择变化时，清除cropper残留样式
+    watch(
+      () => [data.imgSelected],
+      () => {
+        previewTargetRef.value.style = '';
+      }
+    );
+
+    // 全屏变化时，清理cropper
+    watch(
+      () => data.isFullscreen,
+      () => {
+        nextTick(() => {
+          cropper?.destroy();
+          previewTargetRef.value.style = '';
+
+          if (uploadImgRef.value) {
+            cropper = new Cropper(uploadImgRef.value, {
+              viewMode: 2,
+              preview: `.${prefix}-clip-preview-target`
+              // aspectRatio: 16 / 9,
+            });
+          }
+        });
+      }
+    );
+
+    // 弹出层宽度
+    const modalSize = computed(() => {
+      return data.isFullscreen
+        ? {
+            width: '100%',
+            height: '100%'
+          }
+        : {
+            width: '668px',
+            height: '421px'
+          };
     });
 
     const reset = () => {
@@ -85,7 +141,12 @@ export default defineComponent({
         title={ult.value.clipModalTips?.title}
         visible={props.visible}
         onClosed={props.onCancel}
-        to={props.to}
+        showAdjust
+        isFullscreen={data.isFullscreen}
+        onAdjust={(val) => {
+          data.isFullscreen = val;
+        }}
+        {...modalSize.value}
       >
         <div class={`${prefix}-form-item ${prefix}-clip`}>
           <div class={`${prefix}-clip-main`}>
@@ -112,7 +173,7 @@ export default defineComponent({
             )}
           </div>
           <div class={`${prefix}-clip-preview`}>
-            <div class={`${prefix}-clip-preview-target`}></div>
+            <div class={`${prefix}-clip-preview-target`} ref={previewTargetRef}></div>
           </div>
         </div>
         <div class={`${prefix}-form-item`}>
@@ -122,6 +183,7 @@ export default defineComponent({
             onClick={() => {
               const cvs = cropper.getCroppedCanvas();
               bus.emit(
+                editorId,
                 'uploadImage',
                 [base642File(cvs.toDataURL('image/png'))],
                 props.onOk

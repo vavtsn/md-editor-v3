@@ -20,7 +20,7 @@ export const setPosition = (
       tarDom.focus();
     }, 0);
   } else {
-    console.log('无法重置光标位置！');
+    console.log('can not reset position!');
   }
 };
 
@@ -92,7 +92,7 @@ export const goto = (
   }
 ) => {
   if (!url) {
-    console.warn('无效的链接！');
+    console.warn('error link!');
   }
 
   const aEle = document.createElement('a');
@@ -120,25 +120,55 @@ export const goto = (
  * @returns 清除监听的方法
  */
 export const scrollAuto = (pEle: HTMLElement, cEle: HTMLElement) => {
-  const pHeight = pEle.clientHeight;
-  const cHeight = cEle.clientHeight;
-
-  const pScrollHeight = pEle.scrollHeight;
-  const cScrollHeight = cEle.scrollHeight;
-
-  // 计算一个高度比
-  const scale = (pScrollHeight - pHeight) / (cScrollHeight - cHeight);
-
-  const scrollHandler = () => {
-    cEle.scrollTo({ top: pEle.scrollTop / scale });
-  };
-
-  pEle.removeEventListener('scroll', scrollHandler);
-  pEle.addEventListener('scroll', scrollHandler);
-
-  return () => {
+  // 注册一个防抖监听事件函数
+  const addEvent = debounce(() => {
+    // 宿主绑定事件
     pEle.removeEventListener('scroll', scrollHandler);
+    pEle.addEventListener('scroll', scrollHandler);
+
+    // 寄主绑定事件
+    cEle.removeEventListener('scroll', scrollHandler);
+    cEle.addEventListener('scroll', scrollHandler);
+  }, 50);
+
+  const scrollHandler = (e: Event) => {
+    const pHeight = pEle.clientHeight;
+    const cHeight = cEle.clientHeight;
+
+    const pScrollHeight = pEle.scrollHeight;
+    const cScrollHeight = cEle.scrollHeight;
+    // 计算一个高度比
+    const scale = (pScrollHeight - pHeight) / (cScrollHeight - cHeight);
+
+    if (e.target === pEle) {
+      // 清除寄主监听
+      cEle.removeEventListener('scroll', scrollHandler);
+      cEle.scrollTo({
+        top: pEle.scrollTop / scale
+        // behavior: 'smooth'
+      });
+
+      addEvent();
+    } else {
+      // 清除宿主监听
+      pEle.removeEventListener('scroll', scrollHandler);
+
+      pEle.scrollTo({
+        top: cEle.scrollTop * scale
+        // behavior: 'smooth'
+      });
+
+      addEvent();
+    }
   };
+
+  return [
+    addEvent,
+    () => {
+      pEle.removeEventListener('scroll', scrollHandler);
+      cEle.removeEventListener('scroll', scrollHandler);
+    }
+  ];
 };
 
 /**
@@ -167,4 +197,47 @@ export const base642File = (base64: string, fileName = 'image.png') => {
   }
 
   return null;
+};
+
+/**
+ * 对代码块添加行号
+ *
+ * @param code 代码html内容
+ * @returns string
+ */
+export const generateCodeRowNumber = (code: string) => {
+  if (!code.trim()) {
+    return code;
+  }
+
+  const list = code.split('\n');
+  // 行号html代码拼接列表
+  const rowNumberList = ['<span rn-wrapper aria-hidden="true">'];
+  list.forEach(() => {
+    rowNumberList.push('<span></span>');
+  });
+  rowNumberList.push('</span>');
+  return `<span class="code-block">${code}</span>${rowNumberList.join('')}`;
+};
+
+/**
+ * 防抖方法封装
+ *
+ * @param fn 目标方法
+ * @param ms 防抖延迟
+ * @returns
+ */
+export const debounce = (fn: (...params: Array<any>) => any, ms = 200) => {
+  let timer = 0;
+
+  return (...params: Array<any>) => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+
+    timer = window.setTimeout(() => {
+      fn.apply(this, params);
+      timer = 0;
+    }, ms);
+  };
 };
