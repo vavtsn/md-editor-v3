@@ -14,10 +14,9 @@ export default defineComponent({
     return () => (
       <header class="page-header">
         <section class="container">
-          <h1 class="project-name">md-editor-v3</h1>
-          <p class="project-desc">
-            Markdown编辑器，基于vue3，使用jsx和typescript语法开发，支持切换主题、prettier美化文本等。
-          </p>
+          <router-link to="/">Home</router-link>
+          <router-link to="/doc">文档</router-link>
+          <router-link to="/about">关于</router-link>
           <p class="header-actions">
             <button class="btn btn-header">
               <a

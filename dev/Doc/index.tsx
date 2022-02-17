@@ -26,14 +26,7 @@ export default defineComponent({
     });
     return () => (
       <div class="doc">
-        <div class="container">
-          <Editor
-            theme={props.theme}
-            modelValue={mdText.value}
-            previewOnly
-            showCodeRowNumber
-          />
-        </div>
+        <div class="container">文档文档</div>
       </div>
     );
   }
